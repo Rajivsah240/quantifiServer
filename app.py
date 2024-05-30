@@ -2,12 +2,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 import bcrypt
-import base64
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-client = MongoClient("mongodb+srv://quantifi:quantifi1@fitverse.tyumw7d.mongodb.net/?retryWrites=true&w=majority&appName=Fitverse")
+MONGODB_URI = os.getenv('MONGODB_URI')
+client = MongoClient(MONGODB_URI)
 db = client['user_database']
 users_collection = db['users']
 
