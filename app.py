@@ -3,6 +3,9 @@ from flask_cors import CORS
 from pymongo import MongoClient
 import bcrypt
 import os
+# import google.auth.transport.requests
+# from google.oauth2 import id_token
+
 
 app = Flask(__name__)
 CORS(app)
@@ -62,5 +65,24 @@ def handle_login():
     else:
         return jsonify({'success': False, 'message': 'Invalid email or password'}), 401
 
+
+@app.route('/checkUser', methods=['POST'])
+def check_user():
+    data = request.get_json()
+    email = data.get('email')
+
+    if not email:
+        return jsonify({'success': False, 'message': 'Email is required'}), 400
+
+    user = users_collection.find_one({'email': email})
+
+    if user:
+        return jsonify({'success': True, 'exists': True, 'message': 'User already exists'})
+    else:
+        return jsonify({'success': True, 'exists': False, 'message': 'User does not exist'})
+
+
+
+
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True,host="0.0.0.0")
