@@ -8,12 +8,17 @@ import random
 app = Flask(__name__)
 CORS(app)
 
+MAIL_EMAIL=os.getenv('MAIL_EMAIL')
+print(MAIL_EMAIL)
+MAIL_PASSWORD=os.getenv('MAIL_PASSWORD')
+
 app.config['MAIL_SERVER'] = 'smtp.office365.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = 'quantifi_1@outlook.com'
-app.config['MAIL_PASSWORD'] = 'cdocavvxcqgtqemx'        #Quantifi@1
+app.config['MAIL_DEFAULT_SENDER'] = ('Quantifi', MAIL_EMAIL)
+app.config['MAIL_USERNAME'] = MAIL_EMAIL
+app.config['MAIL_PASSWORD'] = MAIL_PASSWORD        #Quantifi@1
 
 mail = Mail(app)
 
@@ -99,7 +104,7 @@ def check_email():
         otp = ''.join(random.choices('0123456789', k=4))
         users_collection.update_one({'email': email}, {'$set': {'otp': otp}})
 
-        msg = Message('OTP Verification', sender='quantifi_1@outlook.com', recipients=[email])
+        msg = Message('OTP Verification', recipients=[email])
         msg.html = f"""
 <!DOCTYPE html>
 <html>
