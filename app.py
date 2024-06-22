@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
@@ -5,11 +6,15 @@ import bcrypt
 import os
 from flask_mail import Mail, Message
 import random
+from flask_socketio import SocketIO, join_room, leave_room, emit
+
+
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 MAIL_EMAIL=os.getenv('MAIL_EMAIL')
-print(MAIL_EMAIL)
+# print(MAIL_EMAIL)
 MAIL_PASSWORD=os.getenv('MAIL_PASSWORD')
 
 app.config['MAIL_SERVER'] = 'smtp.office365.com'
@@ -26,6 +31,8 @@ MONGODB_URI = os.getenv('MONGODB_URI')
 client = MongoClient(MONGODB_URI)
 db = client['user_database']
 users_collection = db['users']
+groups_collection = db['groups']
+messages_collection = db['messages']
 
 @app.route('/signup', methods=['POST'])
 def handle_signup():
@@ -194,6 +201,99 @@ def reset_password():
 
     return jsonify({'success': True, 'message': 'Password has been reset successfully'})
 
+
+
+@app.route('/user-groups', methods=['GET'])
+def get_user_groups():
+    email = request.args.get('email')
+    if not email:
+        return jsonify({'success': False, 'message': 'Email is required'}), 400
+
+    user = users_collection.find_one({'email': email})
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+
+    group_ids = user.get('groups', [])
+    print(f'Group IDs for user {email}: {group_ids}')
+
+    groups = groups_collection.find({'group_id': {'$in': group_ids}})
+    group_list = [{'id': group['group_id'], 'name': group['group_name']} for group in groups]
+
+    return jsonify({'success': True, 'groups': group_list})
+
+
+
+
+@app.route('/create-group', methods=['POST'])
+def create_group():
+    data = request.get_json()
+    group_name = data.get('groupName')
+    user_email = data.get('userEmail')
+
+    if not group_name or not user_email:
+        return jsonify({'success': False, 'message': 'Group name and user email are required'}), 400
+
+    group_id = str(random.randint(100000, 999999))
+    groups_collection.insert_one({'group_id': group_id, 'group_name': group_name, 'members': [user_email]})
+    users_collection.update_one({'email': user_email}, {'$push': {'groups': group_id}})
+
+    return jsonify({'success': True, 'group_id': group_id})
+
+@app.route('/join-group', methods=['POST'])
+def join_group():
+    data = request.get_json()
+    group_id = data.get('groupId')
+    user_email = data.get('userEmail')
+
+    if not group_id or not user_email:
+        return jsonify({'success': False, 'message': 'Group ID and user email are required'}), 400
+
+    group = groups_collection.find_one({'group_id': group_id})
+
+    if group:
+        if user_email not in group['members']:
+            groups_collection.update_one({'group_id': group_id}, {'$push': {'members': user_email}})
+            users_collection.update_one({'email': user_email}, {'$push': {'groups': group_id}})
+        return jsonify({'success': True, 'message': 'Joined group successfully'})
+    else:
+        return jsonify({'success': False, 'message': 'Group not found'}), 404
+
+@app.route('/messages', methods=['GET'])
+def get_messages():
+    group_id = request.args.get('groupId')
+
+    if not group_id:
+        return jsonify({'success': False, 'message': 'Group ID is required'}), 400
+
+    messages = db.messages.find({'group_id': group_id})
+    message_list = [{'userEmail': msg['user_email'],'username':msg['username'], 'message': msg['message']} for msg in messages]
+
+    return jsonify({'success': True, 'messages': message_list})
+
+
+@socketio.on('joinGroup')
+def on_join(data):
+    group_id = data['groupId']
+    user_email = data['userEmail']
+    join_room(group_id)
+    emit('userJoined', {'userEmail': user_email}, room=group_id)
+
+@socketio.on('message')
+def on_message(data):
+    group_id = data['groupId']
+    user_email = data['userEmail']
+    username = data['username']
+    message_text = data['message']
+
+    message_data = {
+        'group_id': group_id,
+        'user_email': user_email,
+        'username' : username,
+        'message': message_text,
+        'timestamp': datetime.now()
+    }
+    db.messages.insert_one(message_data)
+    emit('newMessage', {'userEmail': user_email, 'username' : username, 'message': message_text}, room=group_id)
 
 
 if __name__ == '__main__':
