@@ -1,3 +1,7 @@
+import eventlet
+eventlet.monkey_patch()
+
+
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -13,9 +17,8 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-MAIL_EMAIL=os.getenv('MAIL_EMAIL')
-# print(MAIL_EMAIL)
-MAIL_PASSWORD=os.getenv('MAIL_PASSWORD')
+MAIL_EMAIL = os.getenv('MAIL_EMAIL')
+MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
 
 app.config['MAIL_SERVER'] = 'smtp.office365.com'
 app.config['MAIL_PORT'] = 587
@@ -23,7 +26,7 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_DEFAULT_SENDER'] = ('Quantifi', MAIL_EMAIL)
 app.config['MAIL_USERNAME'] = MAIL_EMAIL
-app.config['MAIL_PASSWORD'] = MAIL_PASSWORD        #Quantifi@1
+app.config['MAIL_PASSWORD'] = MAIL_PASSWORD
 
 mail = Mail(app)
 
@@ -54,9 +57,8 @@ def handle_signup():
         'name': name,
         'email': email,
         'password': hashed_password,
-        'profile_pic':profile_pic_url
+        'profile_pic': profile_pic_url
     }
-
 
     users_collection.insert_one(user_data)
 
@@ -77,13 +79,12 @@ def handle_login():
         user_data = {
             'name': user['name'],
             'email': user['email'],
-            'profile_pic' : user['profile_pic']
+            'profile_pic': user['profile_pic']
         }
 
         return jsonify({'success': True, 'message': 'Login successful', 'user': user_data})
     else:
         return jsonify({'success': False, 'message': 'Invalid email or password'}), 401
-
 
 @app.route('/checkUser', methods=['POST'])
 def check_user():
@@ -185,7 +186,6 @@ def verify_otp():
     else:
         return jsonify({'success': False, 'message': 'Invalid OTP'})
 
-
 @app.route('/resetPassword', methods=['POST'])
 def reset_password():
     data = request.get_json()
@@ -201,8 +201,6 @@ def reset_password():
 
     return jsonify({'success': True, 'message': 'Password has been reset successfully'})
 
-
-
 @app.route('/user-groups', methods=['GET'])
 def get_user_groups():
     email = request.args.get('email')
@@ -214,15 +212,10 @@ def get_user_groups():
         return jsonify({'success': False, 'message': 'User not found'}), 404
 
     group_ids = user.get('groups', [])
-    print(f'Group IDs for user {email}: {group_ids}')
-
     groups = groups_collection.find({'group_id': {'$in': group_ids}})
     group_list = [{'id': group['group_id'], 'name': group['group_name']} for group in groups]
 
     return jsonify({'success': True, 'groups': group_list})
-
-
-
 
 @app.route('/create-group', methods=['POST'])
 def create_group():
@@ -266,10 +259,9 @@ def get_messages():
         return jsonify({'success': False, 'message': 'Group ID is required'}), 400
 
     messages = db.messages.find({'group_id': group_id})
-    message_list = [{'userEmail': msg['user_email'],'username':msg['username'], 'message': msg['message']} for msg in messages]
+    message_list = [{'userEmail': msg['user_email'], 'username': msg['username'], 'message': msg['message']} for msg in messages]
 
     return jsonify({'success': True, 'messages': message_list})
-
 
 @socketio.on('joinGroup')
 def on_join(data):
@@ -288,13 +280,13 @@ def on_message(data):
     message_data = {
         'group_id': group_id,
         'user_email': user_email,
-        'username' : username,
+        'username': username,
         'message': message_text,
         'timestamp': datetime.now()
     }
     db.messages.insert_one(message_data)
-    emit('newMessage', {'userEmail': user_email, 'username' : username, 'message': message_text}, room=group_id)
-
+    emit('newMessage', {'userEmail': user_email, 'username': username, 'message': message_text}, room=group_id)
 
 if __name__ == '__main__':
+    # socketio.run(app, debug=True, host='0.0.0.0')
     app.run(debug=True,host='0.0.0.0')
