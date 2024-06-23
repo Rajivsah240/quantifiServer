@@ -1,7 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
-
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -10,12 +6,11 @@ import bcrypt
 import os
 from flask_mail import Mail, Message
 import random
-from flask_socketio import SocketIO, join_room, leave_room, emit
 
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
 
 MAIL_EMAIL = os.getenv('MAIL_EMAIL')
 MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
@@ -263,30 +258,5 @@ def get_messages():
 
     return jsonify({'success': True, 'messages': message_list})
 
-@socketio.on('joinGroup')
-def on_join(data):
-    group_id = data['groupId']
-    user_email = data['userEmail']
-    join_room(group_id)
-    emit('userJoined', {'userEmail': user_email}, room=group_id)
-
-@socketio.on('message')
-def on_message(data):
-    group_id = data['groupId']
-    user_email = data['userEmail']
-    username = data['username']
-    message_text = data['message']
-
-    message_data = {
-        'group_id': group_id,
-        'user_email': user_email,
-        'username': username,
-        'message': message_text,
-        'timestamp': datetime.now()
-    }
-    db.messages.insert_one(message_data)
-    emit('newMessage', {'userEmail': user_email, 'username': username, 'message': message_text}, room=group_id)
-
 if __name__ == '__main__':
-    # socketio.run(app, debug=True, host='0.0.0.0')
     app.run(debug=True,host='0.0.0.0')
