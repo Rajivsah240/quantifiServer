@@ -12,102 +12,120 @@ app = Flask(__name__)
 CORS(app)
 
 
-MAIL_EMAIL = os.getenv('MAIL_EMAIL')
-MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+MAIL_EMAIL = os.getenv("MAIL_EMAIL")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 
-app.config['MAIL_SERVER'] = 'smtp.office365.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_DEFAULT_SENDER'] = ('Quantifi', MAIL_EMAIL)
-app.config['MAIL_USERNAME'] = MAIL_EMAIL
-app.config['MAIL_PASSWORD'] = MAIL_PASSWORD
+app.config["MAIL_SERVER"] = "smtp.office365.com"
+app.config["MAIL_PORT"] = 587
+app.config["MAIL_USE_TLS"] = True
+app.config["MAIL_USE_SSL"] = False
+app.config["MAIL_DEFAULT_SENDER"] = ("Quantifi", MAIL_EMAIL)
+app.config["MAIL_USERNAME"] = MAIL_EMAIL
+app.config["MAIL_PASSWORD"] = MAIL_PASSWORD
 
 mail = Mail(app)
 
-MONGODB_URI = os.getenv('MONGODB_URI')
+MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
-db = client['user_database']
-users_collection = db['users']
-groups_collection = db['groups']
-messages_collection = db['messages']
+db = client["user_database"]
+users_collection = db["users"]
+groups_collection = db["groups"]
+messages_collection = db["messages"]
 
-@app.route('/signup', methods=['POST'])
+
+@app.route("/")
+def index():
+    return "Welcome to the Quantifi API!"
+
+
+@app.route("/signup", methods=["POST"])
 def handle_signup():
     data = request.get_json()
-    name = data.get('name')
-    email = data.get('email')
-    password = data.get('password')
-    profile_pic_url = data.get('profilePic')
+    name = data.get("name")
+    email = data.get("email")
+    password = data.get("password")
+    profile_pic_url = data.get("profilePic")
 
     if not name or not email or not password:
-        return jsonify({'success': False, 'message': 'All fields are required'}), 400
+        return jsonify({"success": False, "message": "All fields are required"}), 400
 
-    if users_collection.find_one({'email': email}):
-        return jsonify({'success': False, 'message': 'Email already exists'}), 400
+    if users_collection.find_one({"email": email}):
+        return jsonify({"success": False, "message": "Email already exists"}), 400
 
-    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
     user_data = {
-        'name': name,
-        'email': email,
-        'password': hashed_password,
-        'profile_pic': profile_pic_url
+        "name": name,
+        "email": email,
+        "password": hashed_password,
+        "profile_pic": profile_pic_url,
     }
 
     users_collection.insert_one(user_data)
 
-    return jsonify({'success': True, 'message': 'Signup successful'})
+    return jsonify({"success": True, "message": "Signup successful"})
 
-@app.route('/login', methods=['POST'])
+
+@app.route("/login", methods=["POST"])
 def handle_login():
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    email = data.get("email")
+    password = data.get("password")
 
     if not email or not password:
-        return jsonify({'success': False, 'message': 'Email and password are required'}), 400
+        return (
+            jsonify({"success": False, "message": "Email and password are required"}),
+            400,
+        )
 
-    user = users_collection.find_one({'email': email})
+    user = users_collection.find_one({"email": email})
 
-    if user and bcrypt.checkpw(password.encode('utf-8'), user['password']):
+    if user and bcrypt.checkpw(password.encode("utf-8"), user["password"]):
         user_data = {
-            'name': user['name'],
-            'email': user['email'],
-            'profile_pic': user['profile_pic']
+            "name": user["name"],
+            "email": user["email"],
+            "profile_pic": user["profile_pic"],
         }
 
-        return jsonify({'success': True, 'message': 'Login successful', 'user': user_data})
+        return jsonify(
+            {"success": True, "message": "Login successful", "user": user_data}
+        )
     else:
-        return jsonify({'success': False, 'message': 'Invalid email or password'}), 401
+        return jsonify({"success": False, "message": "Invalid email or password"}), 401
 
-@app.route('/checkUser', methods=['POST'])
+
+@app.route("/checkUser", methods=["POST"])
 def check_user():
     data = request.get_json()
-    email = data.get('email')
+    email = data.get("email")
 
     if not email:
-        return jsonify({'success': False, 'message': 'Email is required'}), 400
+        return jsonify({"success": False, "message": "Email is required"}), 400
 
-    user = users_collection.find_one({'email': email})
+    user = users_collection.find_one({"email": email})
 
     if user:
-        return jsonify({'success': True, 'exists': True, 'message': 'User already exists'})
+        return jsonify(
+            {"success": True, "exists": True, "message": "User already exists"}
+        )
     else:
-        return jsonify({'success': True, 'exists': False, 'message': 'User does not exist'})
+        return jsonify(
+            {"success": True, "exists": False, "message": "User does not exist"}
+        )
 
-@app.route('/checkEmail', methods=['POST'])
+
+@app.route("/checkEmail", methods=["POST"])
 def check_email():
     data = request.get_json()
-    email = data.get('email')
+    email = data.get("email")
 
-    user = users_collection.find_one({'email': email})
+    user = users_collection.find_one({"email": email})
 
     if user:
-        otp = ''.join(random.choices('0123456789', k=4))
-        users_collection.update_one({'email': email}, {'$set': {'otp': otp}})
+        otp = "".join(random.choices("0123456789", k=4))
+        users_collection.update_one({"email": email}, {"$set": {"otp": otp}})
 
-        msg = Message('OTP Verification', recipients=[email])
+        msg = Message("OTP Verification", recipients=[email])
         msg.html = f"""
 <!DOCTYPE html>
 <html>
@@ -162,101 +180,182 @@ def check_email():
 """
         mail.send(msg)
 
-        return jsonify({'success': True, 'message': 'Email exists'})
+        return jsonify({"success": True, "message": "Email exists"})
     else:
-        return jsonify({'success': False, 'message': 'Email does not exist'})
+        return jsonify({"success": False, "message": "Email does not exist"})
 
-@app.route('/verifyOTP', methods=['POST'])
+
+@app.route("/verifyOTP", methods=["POST"])
 def verify_otp():
     data = request.get_json()
-    email = data.get('email')
-    otp = data.get('otp')
+    email = data.get("email")
+    otp = data.get("otp")
 
-    user = users_collection.find_one({'email': email, 'otp': otp})
+    user = users_collection.find_one({"email": email, "otp": otp})
 
     if user:
-        users_collection.update_one({'email': email}, {'$unset': {'otp': ""}})
+        users_collection.update_one({"email": email}, {"$unset": {"otp": ""}})
 
-        return jsonify({'success': True, 'message': 'OTP verified'})
+        return jsonify({"success": True, "message": "OTP verified"})
     else:
-        return jsonify({'success': False, 'message': 'Invalid OTP'})
+        return jsonify({"success": False, "message": "Invalid OTP"})
 
-@app.route('/resetPassword', methods=['POST'])
+
+@app.route("/resetPassword", methods=["POST"])
 def reset_password():
     data = request.get_json()
-    email = data.get('email')
-    new_password = data.get('newPassword')
+    email = data.get("email")
+    new_password = data.get("newPassword")
 
     if not new_password:
-        return jsonify({'success': False, 'message': 'Password is required'}), 400
+        return jsonify({"success": False, "message": "Password is required"}), 400
 
-    hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+    hashed_password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
 
-    users_collection.update_one({'email': email}, {'$set': {'password': hashed_password}})
+    users_collection.update_one(
+        {"email": email}, {"$set": {"password": hashed_password}}
+    )
 
-    return jsonify({'success': True, 'message': 'Password has been reset successfully'})
+    return jsonify({"success": True, "message": "Password has been reset successfully"})
 
-@app.route('/user-groups', methods=['GET'])
-def get_user_groups():
-    email = request.args.get('email')
-    if not email:
-        return jsonify({'success': False, 'message': 'Email is required'}), 400
 
-    user = users_collection.find_one({'email': email})
-    if not user:
-        return jsonify({'success': False, 'message': 'User not found'}), 404
 
-    group_ids = user.get('groups', [])
-    groups = groups_collection.find({'group_id': {'$in': group_ids}})
-    group_list = [{'id': group['group_id'], 'name': group['group_name']} for group in groups]
 
-    return jsonify({'success': True, 'groups': group_list})
-
-@app.route('/create-group', methods=['POST'])
+@app.route("/create-group", methods=["POST"])
 def create_group():
     data = request.get_json()
-    group_name = data.get('groupName')
-    user_email = data.get('userEmail')
+    group_name = data.get("groupName")
+    group_description = data.get("groupDescription")
+    group_admin = data.get("groupAdmin")
+    group_profile = data.get("groupProfile")
+    user_email = data.get("userEmail")
 
     if not group_name or not user_email:
-        return jsonify({'success': False, 'message': 'Group name and user email are required'}), 400
+        return (
+            jsonify(
+                {"success": False, "message": "Group name and user email are required"}
+            ),
+            400,
+        )
 
     group_id = str(random.randint(100000, 999999))
-    groups_collection.insert_one({'group_id': group_id, 'group_name': group_name, 'members': [user_email]})
-    users_collection.update_one({'email': user_email}, {'$push': {'groups': group_id}})
+    groups_collection.insert_one(
+        {
+            "group_id": group_id,
+            "group_name": group_name,
+            "members": [user_email],
+            "group_description": group_description,
+            "group_admin": group_admin,
+            "group_profile": group_profile,
+        }
+    )
+    users_collection.update_one({"email": user_email}, {"$push": {"groups": group_id}})
 
-    return jsonify({'success': True, 'group_id': group_id})
+    return jsonify({"success": True, "group_id": group_id})
 
-@app.route('/join-group', methods=['POST'])
+
+@app.route("/join-group", methods=["POST"])
 def join_group():
     data = request.get_json()
-    group_id = data.get('groupId')
-    user_email = data.get('userEmail')
+    group_id = data.get("groupId")
+    user_email = data.get("userEmail")
 
     if not group_id or not user_email:
-        return jsonify({'success': False, 'message': 'Group ID and user email are required'}), 400
+        return (
+            jsonify(
+                {"success": False, "message": "Group ID and user email are required"}
+            ),
+            400,
+        )
 
-    group = groups_collection.find_one({'group_id': group_id})
+    group = groups_collection.find_one({"group_id": group_id})
 
     if group:
-        if user_email not in group['members']:
-            groups_collection.update_one({'group_id': group_id}, {'$push': {'members': user_email}})
-            users_collection.update_one({'email': user_email}, {'$push': {'groups': group_id}})
-        return jsonify({'success': True, 'message': 'Joined group successfully'})
+        if user_email not in group["members"]:
+            groups_collection.update_one(
+                {"group_id": group_id}, {"$push": {"members": user_email}}
+            )
+            users_collection.update_one(
+                {"email": user_email}, {"$push": {"groups": group_id}}
+            )
+        return jsonify({"success": True, "message": "Joined group successfully"})
     else:
-        return jsonify({'success': False, 'message': 'Group not found'}), 404
+        return jsonify({"success": False, "message": "Group not found"}), 404
 
-@app.route('/messages', methods=['GET'])
-def get_messages():
-    group_id = request.args.get('groupId')
+@app.route("/leave-group", methods=["POST"])
+def leave_group():
+    data = request.get_json()
+    group_id = data.get("groupId")
+    user_email = data.get("userEmail")
+
+    if not group_id or not user_email:
+        return jsonify({"success": False, "message": "Group ID and user email are required"}), 400
+
+    group = groups_collection.find_one({"group_id": group_id})
+
+    if not group:
+        return jsonify({"success": False, "message": "Group not found"}), 404
+
+    if user_email in group["members"]:
+        groups_collection.update_one(
+            {"group_id": group_id}, {"$pull": {"members": user_email}}
+        )
+        users_collection.update_one(
+            {"email": user_email}, {"$pull": {"groups": group_id}}
+        )
+        return jsonify({"success": True, "message": "Left group successfully"})
+    else:
+        return jsonify({"success": False, "message": "User is not a member of this group"}), 400
+
+
+
+
+@app.route("/user-groups", methods=["GET"])
+def get_user_groups():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"success": False, "message": "Email is required"}), 400
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    group_ids = user.get("groups", [])
+    groups = groups_collection.find({"group_id": {"$in": group_ids}})
+
+    group_list = []
+    for group in groups:
+        group_data = {
+            "id": group["group_id"],
+            "name": group["group_name"],
+            "description": group["group_description"],
+            "profile": group["group_profile"],
+            "admin": group["group_admin"],
+        }
+        group_list.append(group_data)
+
+    return jsonify({"success": True, "groups": group_list})
+
+
+@app.route("/group-members", methods=["GET"])
+def get_group_members():
+    group_id = request.args.get("groupId")
 
     if not group_id:
-        return jsonify({'success': False, 'message': 'Group ID is required'}), 400
+        return jsonify({"success": False, "message": "Group ID is required"}), 400
 
-    messages = db.messages.find({'group_id': group_id})
-    message_list = [{'userEmail': msg['user_email'], 'username': msg['username'], 'message': msg['message']} for msg in messages]
+    group = groups_collection.find_one({"group_id": group_id})
 
-    return jsonify({'success': True, 'messages': message_list})
+    if group:
+        members = group["members"]
+        member_details = users_collection.find(
+            {"email": {"$in": members}}, {"name": 1, "email": 1, "_id": 0}
+        )
+        member_list = list(member_details)
+        return jsonify({"success": True, "members": member_list})
+    else:
+        return jsonify({"success": False, "message": "Group not found"}), 404
 
-if __name__ == '__main__':
-    app.run(debug=True,host='0.0.0.0')
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0")
